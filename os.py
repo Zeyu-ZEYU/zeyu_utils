@@ -8,4 +8,3 @@ def run_cmd(cmd, failure_warning=True):
     except subprocess.CalledProcessError as e:
         if failure_warning:
             print("WARNING:", e, file=sys.stderr)
-        return None

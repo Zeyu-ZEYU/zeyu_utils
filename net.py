@@ -1,3 +1,4 @@
+import enum
 import pickle
 import socket
 import sys
@@ -135,25 +136,76 @@ class SocketMsger:
                 time.sleep(1)
 
 
+class RemoteProgramStatus(enum.Enum):
+    COMPLETED = 0
+    ERROR = 1
+    NON_EXISTENT = 2
+    RUNNING = 3
+
+
+class RemoteProgramChecker:
+    def __init__(self, ip, port, handler):
+        self.__ip = ip
+        self.__port = port
+        self.__handler = handler
+
+    def check_status(self):
+        connm = SocketMsger.tcp_connect(self.__ip, self.__port)
+        connm.send(("HDL", self.__handler))
+        status = connm.recv()
+        return status
+
+
 class RemoteProgramRunner:
     def __init__(self, listening_ip, listening_port):
         self.__listener = SocketMsger.tcp_listener(listening_ip, listening_port)
-        self.__thread = threading.Thread(target=self.__run)
-        self.__thread.start()
+        self.__thread = threading.Thread(target=self.__listener_thread)
+        self.__handler_lock = threading.Lock()
+        self.__next_handler = 0
+        self.__handler_status = {}
+        self.__is_started = False
 
-    def __run(self):
+    def start(self):
+        if not self.__is_started:
+            self.__is_started = True
+            self.__thread.start()
+
+    def __listener_thread(self):
         while True:
             connm, _ = self.__listener.accept()
             thread = threading.Thread(target=self.__connm_thread, args=(connm,))
             thread.start()
 
     def __connm_thread(self, connm):
-        cmd = connm.recv()
-        if cmd is None:
+        request = connm.recv()
+        if request is None:
             return
-        thread = threading.Thread(target=zos.run_cmd, args=(cmd,))
-        thread.start()
+        req_type = request[0]
+        req_data = request[1]
+        if req_type == "CMD":
+            handler = self.__assign_handler()
+            self.__handler_status[handler] = RemoteProgramStatus.RUNNING
+            connm.send(handler)
+            output = zos.run_cmd(req_data)
+            if output is None:
+                self.__handler_status[handler] = RemoteProgramStatus.ERROR
+            else:
+                self.__handler_status[handler] = RemoteProgramStatus.COMPLETED
+        elif req_type == "HDL":
+            if req_data in self.__handler_status:
+                connm.send(self.__handler_status[req_data])
+            else:
+                connm.send(RemoteProgramStatus.NON_EXISTENT)
+
+    def __assign_handler(self):
+        with self.__handler_lock:
+            handler = self.__next_handler
+            self.__next_handler += 1
+        return handler
 
     @staticmethod
     def send_cmd(ip, port, cmd):
-        SocketMsger.tcp_connect(ip, port).send(cmd)
+        connm = SocketMsger.tcp_connect(ip, port)
+        connm.send(("CMD", cmd))
+        handler = connm.recv()
+        return RemoteProgramChecker(ip, port, handler)
