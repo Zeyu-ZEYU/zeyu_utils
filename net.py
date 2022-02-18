@@ -1,7 +1,10 @@
 import pickle
 import socket
 import sys
+import threading
 import time
+
+import zeyu_utils.os as zos
 
 
 class SocketMsger:
@@ -130,3 +133,27 @@ class SocketMsger:
                 if not retry:
                     return
                 time.sleep(1)
+
+
+class RemoteProgramRunner:
+    def __init__(self, listening_ip, listening_port):
+        self.__listener = SocketMsger.tcp_listener(listening_ip, listening_port)
+        self.__thread = threading.Thread(target=self.__run)
+        self.__thread.start()
+
+    def __run(self):
+        while True:
+            connm, _ = self.__listener.accept()
+            thread = threading.Thread(target=self.__connm_thread, args=(connm,))
+            thread.start()
+
+    def __connm_thread(self, connm):
+        cmd = connm.recv()
+        if cmd is None:
+            return
+        thread = threading.Thread(target=zos.run_cmd, args=(cmd,))
+        thread.start()
+
+    @staticmethod
+    def send_cmd(ip, port, cmd):
+        SocketMsger.tcp_connect(ip, port).send(cmd)
