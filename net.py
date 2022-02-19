@@ -190,10 +190,12 @@ class RemoteProgramRunner:
             if output is None:
                 self.__handler_status[handler] = RemoteProgramStatus.ERROR
             else:
-                self.__handler_status[handler] = RemoteProgramStatus.COMPLETED
+                self.__handler_status.pop(handler)
         elif req_type == "HDL":
             if req_data in self.__handler_status:
                 connm.send(self.__handler_status[req_data])
+            elif req_data >= 0 and req_data < self.__next_handler:
+                connm.send(RemoteProgramStatus.COMPLETED)
             else:
                 connm.send(RemoteProgramStatus.NON_EXISTENT)
 
