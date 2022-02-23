@@ -170,6 +170,9 @@ class RemoteProgramRunner:
             self.__is_started = True
             self.__thread.start()
 
+    def join(self):
+        self.__thread.join()
+
     def __listener_thread(self):
         while True:
             connm, _ = self.__listener.accept()
