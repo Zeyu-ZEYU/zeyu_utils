@@ -39,13 +39,16 @@ class SocketMsger:
         if self.__closed or self.__is_listener:
             return
         if isinstance(data, str):
-            serialized = 0
+            data_type = 0
             byte_data = data.encode()
+        elif isinstance(data, bytes):
+            data_type = 1
+            byte_data = data
         else:
-            serialized = 1
+            data_type = 2
             byte_data = pickle.dumps(data, protocol=pickle.HIGHEST_PROTOCOL)
-        length = len(byte_data)
-        self.__socket.sendall(f"META({length},{serialized})".encode() + byte_data)
+        data_length = len(byte_data)
+        self.__socket.sendall(f"META({data_type},{data_length})".encode() + byte_data)
 
     def recv(self, blocking=True):
         if self.__closed or self.__is_listener:
@@ -83,10 +86,10 @@ class SocketMsger:
                 return
         meta_rindex = index
         meta = self.__recv_buffer[meta_lindex:meta_rindex].split(b",")
-        length = int(meta[0])
-        deserialized = int(meta[1])
+        data_type = int(meta[0])
+        data_length = int(meta[1])
         body_lindex = meta_rindex + 1
-        while len(self.__recv_buffer) - body_lindex < length:
+        while len(self.__recv_buffer) - body_lindex < data_length:
             try:
                 data = self.__socket.recv(1024)
                 if data == b"":
@@ -95,13 +98,15 @@ class SocketMsger:
                 self.__recv_buffer += data
             except BlockingIOError:
                 return
-        body_rindex = body_lindex + length
+        body_rindex = body_lindex + data_length
         recvd_data = self.__recv_buffer[body_lindex:body_rindex]
         self.__recv_buffer = self.__recv_buffer[body_rindex:]
-        if deserialized:
-            return pickle.loads(recvd_data)
-        else:
+        if data_type == 0:
             return recvd_data.decode()
+        elif data_type == 1:
+            return recvd_data
+        else:
+            return pickle.loads(recvd_data)
 
     def close(self):
         self.__socket.close()
