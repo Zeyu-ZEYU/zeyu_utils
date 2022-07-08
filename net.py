@@ -194,7 +194,7 @@ class RemoteProgramRunner:
             handler = self.__assign_handler()
             self.__handler_status[handler] = RemoteProgramStatus.RUNNING
             connm.send(handler)
-            output = zos.run_cmd(req_data)
+            output = zos.run_cmd(req_data, return_output=False)
             if output is None:
                 self.__handler_status[handler] = RemoteProgramStatus.ERROR
             else:
