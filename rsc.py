@@ -1,3 +1,6 @@
+import copy
+
+
 def draw_cdf(values, labels=None, num_slices=100):
     cdf_values = []
     values = copy.deepcopy(values)
